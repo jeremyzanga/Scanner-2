@@ -1,41 +1,7 @@
-import axios from 'axios'
-
-export interface ExtractedFormField {
-  entryId: string
-  questionTitle: string
-  type: 'text' | 'radio' | 'checkbox' | 'unknown'
-  options?: string[]
-}
-
-export interface FormExtractionResult {
-  success: boolean
-  formActionUrl: string | null
-  fields: ExtractedFormField[]
-  corsBlocked: boolean
-  error?: string
-}
-
-function toViewFormUrl(rawUrl: string): string {
-  // Normaliza cualquier URL de Google Forms (edit, viewform, o con /d/e/) a la
-  // URL pública "viewform" que expone el HTML con los entry.xxxxx
-  try {
-    const u = new URL(rawUrl.trim())
-    if (!u.hostname.includes('docs.google.com')) return rawUrl
-    u.pathname = u.pathname.replace(/\/edit$/, '/viewform').replace(/\/closedform$/, '/viewform')
-    if (!u.pathname.endsWith('/viewform')) {
-      u.pathname = u.pathname.replace(/\/?$/, '/viewform')
-    }
-    u.search = ''
-    return u.toString()
-  } catch {
-    return rawUrl
-  }
-}
-
 function toFormResponseUrl(viewUrl: string): string {
   return viewUrl.replace('/viewform', '/formResponse')
 }
-
+ 
 /**
  * Intenta extraer automáticamente los entry.xxxxx parseando el HTML público
  * del formulario (contiene un blob JSON embebido `FB_PUBLIC_LOAD_DATA_`).
@@ -46,22 +12,22 @@ function toFormResponseUrl(viewUrl: string): string {
  */
 export async function tryExtractEntryIds(rawFormUrl: string): Promise<FormExtractionResult> {
   const viewUrl = toViewFormUrl(rawFormUrl)
-
+ 
   try {
     const response = await axios.get(viewUrl, { responseType: 'text', timeout: 15000 })
     const html: string = response.data
-
+ 
     const match = html.match(/var FB_PUBLIC_LOAD_DATA_ = (\[.*?\]);/s)
     if (!match) {
       return { success: false, formActionUrl: null, fields: [], corsBlocked: false, error: 'No se encontró la estructura del formulario en el HTML.' }
     }
-
+ 
     const data = JSON.parse(match[1])
     const questionsBlock = data?.[1]?.[1]
     if (!Array.isArray(questionsBlock)) {
       return { success: false, formActionUrl: null, fields: [], corsBlocked: false, error: 'Estructura del formulario inesperada.' }
     }
-
+ 
     const fields: ExtractedFormField[] = []
     for (const q of questionsBlock) {
       const title: string = q?.[1] ?? ''
@@ -69,10 +35,10 @@ export async function tryExtractEntryIds(rawFormUrl: string): Promise<FormExtrac
       const entryBlock = q?.[4]?.[0]
       const entryId = entryBlock?.[0]
       if (!entryId) continue
-
+ 
       const optionsRaw = entryBlock?.[1]
       const options = Array.isArray(optionsRaw) ? optionsRaw.map((o: any) => o?.[0]).filter(Boolean) : undefined
-
+ 
       fields.push({
         entryId: `entry.${entryId}`,
         questionTitle: title,
@@ -80,7 +46,7 @@ export async function tryExtractEntryIds(rawFormUrl: string): Promise<FormExtrac
         options,
       })
     }
-
+ 
     return {
       success: true,
       formActionUrl: toFormResponseUrl(viewUrl),
@@ -97,7 +63,7 @@ export async function tryExtractEntryIds(rawFormUrl: string): Promise<FormExtrac
     }
   }
 }
-
+ 
 /**
  * Envía las respuestas reales al Google Form vía POST estándar (el mismo
  * mecanismo que usa el navegador al enviar el <form> HTML de Google).
@@ -113,20 +79,20 @@ export async function submitToGoogleForm(formActionUrl: string, entries: Record<
     for (const [entryId, value] of Object.entries(entries)) {
       body.append(entryId, value)
     }
-
+ 
     await fetch(formActionUrl, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
     })
-
+ 
     return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Error de conexión al enviar el formulario.' }
   }
 }
-
+ 
 export function generateAppsScriptFallback(): string {
   return `/**
  * Apps Script de respaldo para extraer los entry.xxxxx de un Google Form
@@ -147,7 +113,7 @@ function doGet() {
   var form = FormApp.openById('FORM_ID');
   var items = form.getItems();
   var result = [];
-
+ 
   items.forEach(function (item) {
     result.push({
       title: item.getTitle(),
@@ -155,10 +121,11 @@ function doGet() {
       type: item.getType().toString()
     });
   });
-
+ 
   return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
 }
 `
 }
+ 
