@@ -178,5 +178,39 @@ export async function submitToGoogleForm(
     };
 
   }
-
+  export function generateAppsScriptFallback(): string {
+  return `/**
+ * Apps Script de respaldo para extraer los entry.xxxxx de un Google Form
+ * cuando el navegador bloquea la extracción automática por CORS.
+ *
+ * Instrucciones:
+ * 1. Ve a script.google.com -> Nuevo proyecto.
+ * 2. Pega este código.
+ * 3. Reemplaza FORM_ID con el ID de tu formulario (está en la URL, entre /d/ y /edit).
+ * 4. Implementar -> Nueva implementación -> Aplicación web.
+ *    - Ejecutar como: Yo
+ *    - Quién tiene acceso: Cualquiera
+ * 5. Copia la URL de la aplicación web y pégala en "Encuesta Scanner AI"
+ *    en el paso de configuración de Google Forms, en el campo
+ *    "URL de respaldo (Apps Script)".
+ */
+function doGet() {
+  var form = FormApp.openById('FORM_ID');
+  var items = form.getItems();
+  var result = [];
+ 
+  items.forEach(function (item) {
+    result.push({
+      title: item.getTitle(),
+      entryId: 'entry.' + item.getId(),
+      type: item.getType().toString()
+    });
+  });
+ 
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+`
+  }
 }
