@@ -172,13 +172,17 @@ export async function submitToGoogleForm(
 
   }catch(error:any){
 
-    return {
-      ok:false,
-      error:error.message
-    };
+  return {
+    ok:false,
+    error:error.message
+  };
 
-  }
-  export function generateAppsScriptFallback(): string {
+}
+
+}
+
+
+export function generateAppsScriptFallback(): string {
   return `/**
  * Apps Script de respaldo para extraer los entry.xxxxx de un Google Form
  * cuando el navegador bloquea la extracción automática por CORS.
@@ -212,5 +216,4 @@ function doGet() {
     .setMimeType(ContentService.MimeType.JSON);
 }
 `
-  }
 }
